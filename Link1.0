@@ -113,7 +113,6 @@ while i==1:
         for a in RIDs:
             ws = wb.get_sheet_by_name('Chamber%s' % (a))
             ws.append(chamber_data)
-        wb.save(filename)
     c=0 
     for RID in RIDs:                                        #讀取所有設備資料並將資料寫入Execl
         datein='STX,0,'+RID+',A,END:'                                         
