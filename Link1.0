@@ -1,0 +1,148 @@
+import openpyxl
+import logging 
+import os
+import datetime
+import time
+
+i=1
+while i==1:
+    class switch(object):    #Switch 類別
+        def __init__(self, value):
+            self.value = value
+            self.fall = False
+        def __iter__(self):
+    #Return the match method once, then stop'''
+            yield self.match
+            raise StopIteration
+        def match(self, *args):
+    #Indicate whether or not to enter a case suite"""
+            if self.fall or not args:
+                return True
+            elif self.value in args: # changed for v1.5, see below
+                self.fall = True
+                return True
+            else:
+                return False
+    def Error(errorcode):  #定義錯誤
+        er=errorcode
+        for case in switch(er):
+            if case('0'):
+                break
+            if case('1'):
+                logging.debug ('Temp sensor error')
+                break
+            if case('2'):
+                logging.debug ('Humid sensor error')
+                break
+            if case('3'):
+                logging.debug ('Temp &Humid converter error')
+                break
+            if case('4'):
+                logging.debug ('Communication off')
+                break
+            if case('5'):
+                logging.debug ('Internal over high temp')
+                break
+            if case('6'):
+                logging.debug ('Internal over low temp')
+                break
+            if case('7'):
+                logging.debug ('Low humid sensor error')
+                break
+            if case('8'):
+                logging.debug ('Environment over high temp')
+                break
+            if case('9'):
+                logging.debug ('Environment over low temp')
+                break
+            if case('10'):
+                logging.debug ('Low hmid converter error')
+                break
+            if case('11'):
+                logging.debug ('External over high temp')
+                break
+            if case('12'):
+                logging.debug ('Water shortage')
+                break
+            if case('13'):
+                logging.debug ('C1 compressor error')
+                break
+            if case('14'):
+                logging.debug ('C2 compressor error')
+                break
+            if case('15'):
+                logging.debug ('Gas/Water pressure')
+                break
+            if case('16'):
+                logging.debug ('C1 compressor over load')
+                break
+            if case('17'):
+                logging.debug ('C2 compressor over load')
+                break
+            if case('18'):
+                logging.debug ('Fan over load')
+                break
+            if case('19'):
+                logging.debug ('Chamber off')
+                break
+
+
+
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s-%(levelname)s : %(message)s',datefmt='%Y-%m-%d %H:%M')
+    Chamber=[[],[],[],[],[],[],[],[],[],[]]                     #Chamber 回傳的串列資料    
+    copystrdata=[]
+    TP_PV=[]
+    HU_PV=[]    
+    RIDs = ['1','2','3','4','5','6','7','8','9','10']              #Chamber 序號
+    chamber_data=['TIME','STX','TID','RID','A','TYPE','STATUS','TEMP_PV','HUMID_PV','TEMP_SV',
+                  'HUMID_SV','PGM_NAME','CYCLE','STEP','HOUR','MIN','ERROR','END']
+    ntime= datetime.datetime.now()            
+    date=ntime.strftime('%Y%m%d')                          #抓日期                   
+    nowtime=ntime.strftime('%H:%M:%S')                     #抓時間
+
+    filename=date+'.xlsx'                                 #Charmber資料檔案名                                              
+    if os.path.exists(filename):                          #確認檔案是否存在
+        wb = openpyxl.load_workbook(filename)             #開啟檔案
+        print('檔案已開啟。')
+    else:                                                 #建立檔案及分頁
+        wb=openpyxl.Workbook()
+        print('建立新資料檔。')
+        for i in RIDs:
+            wb.create_sheet(index=int(i),title='Chamber%s' % (i)) #建立各分頁
+        wb.remove_sheet(wb.get_sheet_by_name('Sheet'))        #刪除Sheet    
+        for a in RIDs:
+            ws = wb.get_sheet_by_name('Chamber%s' % (a))
+            ws.append(chamber_data)
+        wb.save(filename)
+    c=0 
+    for RID in RIDs:                                        #讀取所有設備資料並將資料寫入Execl
+        datein='STX,0,'+RID+',A,END:'                                         
+        data= input(datein)
+        data2=nowtime+','+data
+        Chamber[int(RID)-1]=data2
+        logging.debug(Chamber[c:c+1])                        #log輸出           
+        copystrdata = Chamber[c]                             #拷貝串列資料為字串
+        strtolist = copystrdata.split(',')                   #分割字串轉串列
+        if len(strtolist)>19:
+            errorcode=strtolist[18]                              #讀取Error       
+            Error(str(errorcode))                                #輸出Error
+            if (errorcode!='0'):
+                logging.debug('設備異常')
+        elif len(strtolist)>17:
+            errorcode=strtolist[16]                              #讀取Error       
+            Error(str(errorcode))                                #輸出Error
+            if (errorcode!='0'):
+                logging.debug('設備異常')        
+        ws = wb.get_sheet_by_name('Chamber%s' % (RID))       #開啟各分頁 
+        ws.append(strtolist)
+        c+=1
+        
+    wb.save(filename)
+    try:
+        while True:
+           time.sleep(1)
+           break
+    except KeyboardInterrupt:
+           print('結束抓取。')
+           i+=1
+
