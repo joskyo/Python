@@ -4,8 +4,8 @@ import os
 import datetime
 import time
 
-i=1
-while i==1:
+z=1
+while z==1:
     class switch(object):    #Switch 類別
         def __init__(self, value):
             self.value = value
@@ -137,9 +137,9 @@ while i==1:
     wb.save(filename)
     try:
         while True:
-           time.sleep(1)
+           time.sleep(5)
            break
     except KeyboardInterrupt:
            print('結束抓取。')
-           i+=1
+           
 
