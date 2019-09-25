@@ -1,0 +1,164 @@
+// 1-動態記憶體使用超量，可在序列傳輸部分加上F() 減少空間
+// 2-1.6.6版後 LiquidCrystal_I2C.cpp 內 找到下列程式碼  將 return 0改為1 
+//   #define printIIC(args)  Wire.write(args)
+//   inline size_t LiquidCrystal_I2C::write(uint8_t value) {
+//   send(value, Rs);
+//   return 1;}
+// 3-ESP8266 的 GND 必須跟 Arduino 的 GND 共接地以形成迴路
+// 4.測試IFTTT https://maker.ifttt.com/trigger/DQA/with/key/bWGwmWXTD6gZpOPlyZ4GCX?value1=25&value2=30
+// 5.測試Thingspeak https://api.thingspeak.com/update?api_key=OIJTQ90TDMBUHUHR&field1=25&field2=50  
+#include <SoftwareSerial.h>
+#include "ESP8266.h"
+#include <LiquidCrystal_I2C.h>
+#include <Wire.h>
+#include "HTU21D.h" 
+#include <SPI.h>
+#define _baudrate   9600
+#define _rxpin      4
+#define _txpin      5
+LiquidCrystal_I2C lcd(0x27,20,4);
+SoftwareSerial debug( _rxpin , _txpin ); // RX, TX 
+HTU21D myHumidity;
+ESP8266 wifi(debug);
+int error = 0;
+int reset = 7;
+
+//*-- IoT Information
+//#define SSID "IP-2.4"
+//#define PASS "********"
+//#define IP "184.106.153.149" // ThingSpeak IP Address: 184.106.153.149
+// 使用 GET 傳送資料的格式
+// GET /update?key=[THINGSPEAK_KEY]&field1=[data 1]&field2=[data 2]...;
+//String GET = "GET /update?key=*********";
+
+void setup() {
+  digitalWrite(reset, HIGH);
+  delay(200); 
+  pinMode(reset, OUTPUT);
+    lcd.init(); 
+    lcd.backlight();
+    myHumidity.begin();
+    Serial.begin( _baudrate );
+    debug.begin( _baudrate );
+    debug.println("AT");
+    delay(1000);
+    if(debug.find("OK"))
+    {
+        Serial.println(F("RECEIVED: OK\nData ready to sent!"));
+        lcd.setCursor(0,0);
+        lcd.print(F("Data ready to sent!"));
+        connectWiFi();     
+    }
+    else{
+    Serial.println(F("NO RESEPONCE!"));
+    lcd.setCursor(0,0);
+    lcd.print(F("WIFI NO RESEPONCE!"));
+    delay(1000);     
+  }
+
+}
+
+void loop() {
+    
+    delay(5000);   // 5 second
+    lcd.init(); // 初始化
+    String ifttt_value_code;
+    String ifttt_postdata1;
+    String ifttt_postdata2;
+    String ifttt_postdata3;
+    float h = myHumidity.readHumidity();
+    float t = myHumidity.readTemperature();
+    String C=String (t,1);//轉字串
+    String D=String (h,1);
+  
+    //Line bot
+    if (t>=27) {  
+      wifi.createTCP("maker.ifttt.com",80);
+      ifttt_value_code = "\n{\"value1\" :" + C + ",\"value2\": " +D+"}";
+      ifttt_postdata1 = "POST /trigger/DQA/with/key/bWGwmWXTD6gZpOPlyZ4GCX HTTP/1.1\r\nHost: maker.ifttt.com\r\nUser-Agent: Arduino\r\n";
+      ifttt_postdata2 = "Accept: */*\r\nContent-Length: " + String(ifttt_value_code.length()) + "\r\n" + "Content-Type: application/json\r\n" + "Connection: close\r\n\r\n";
+      ifttt_postdata3 = ifttt_value_code +"\r\n";
+      wifi.send((const uint8_t*)ifttt_postdata1.c_str(), ifttt_postdata1.length());
+      Serial.println("1");
+      wifi.send((const uint8_t*)ifttt_postdata2.c_str(), ifttt_postdata2.length());
+      Serial.println("2");
+      wifi.send((const uint8_t*)ifttt_postdata3.c_str(), ifttt_postdata3.length());
+      Serial.println("溫度超標拉");
+      delay(500);
+
+    } else {
+
+    }
+
+    // 設定 ESP8266 作為 Client 端
+    debug.println(F("AT+CIPSTART=\"TCP\",\"184.106.153.149\",80")); 
+    if( debug.find( "Error" ) )
+    {
+        Serial.println(F("RECEIVED: Error\nExit1"));
+        lcd.setCursor(0,2);
+        lcd.print(F("Error!"));
+        return;
+    }
+    
+    debug.print(F("AT+CIPSEND="));
+    debug.println(F("58"));
+   
+    if(debug.find( ">" ) )
+    {
+        debug.println("GET /update?key=THINGSPEAK_KEY&field1=" + C + "&field2=" + D +"\r\n");
+        Serial.print(F(">"));
+        
+    }
+    else
+    {   
+        debug.print(F("AT+CIPCLOSE")) ;
+    }
+    if( debug.find("OK") )
+    {
+        Serial.println(F("RECEIVED: OK"));
+       // lcd.setCursor(0,2);
+       // lcd.print(F("update"));
+        error=0;
+    }
+    else
+    {
+        Serial.println(F("RECEIVED: Error\nExit2"));
+       // lcd.setCursor(0,2);
+       // lcd.print(F("update Error!"));
+        error++;
+       
+    }
+  lcd.setCursor(0,0);
+  lcd.print("Environmental Lab");  
+  lcd.setCursor(0,1);
+  lcd.print("Temperature:");
+  lcd.print(C);
+  lcd.print((char)223); 
+  lcd.print("C");
+  lcd.setCursor(0,2);
+  lcd.print("Humidity:");
+  lcd.print(D);
+  lcd.print("%");
+  //lcd.setCursor(0,3);
+  //lcd.print("ERROR Time:");  
+  //lcd.print(error); 
+  
+ if(error>=10){
+  digitalWrite(reset, LOW);
+  }
+  else if (error==0){
+     lcd.setCursor(0,0);
+     lcd.print("Environmental Lab.");  
+    }
+   delay(15000);   // 15 second
+}
+ 
+boolean connectWiFi()
+{   
+    debug.println(F("AT+CWMODE=1"));
+    delay(2000);
+    debug.println(F("AT+CWJAP=\"IP-2.4\",\"*********\""));
+    delay(2000);
+    Serial.println(F("AT+CWJAP=\"IP-2.4\",\"*********\""));
+} 
+ 
